@@ -9,27 +9,34 @@ services:
       POSTGRES_DB: monitoring
     volumes:
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
-    ports:
-      - "5432:5432"
+    # ports:
+    #  - "5432:5432"
 
   backend:
     build: ./backend
-    ports:
-      - "8080:8080"
+    # ports:
+    #   - "8080:8080"
     depends_on:
       - db
+    environment:
+      PING_HOSTS: "db backend frontend nginx pinger"
 
   frontend:
     build: ./frontend
-    ports:
-      - "3000:3000"
+    # ports:
+    #   - "4173:4173"
     depends_on:
       - backend
 
   pinger:
     build: ./pinger
     depends_on:
+      - db
       - backend
+      - frontend
+      - nginx
+    environment:
+      PING_INTERVAL: 10s
 
   nginx:
     build: ./nginx
