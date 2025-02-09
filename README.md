@@ -1,32 +1,31 @@
-# Docker Container Monitoring
+# Мониторинг Docker-контейнеров
 
-This project provides a solution for monitoring Docker containers by pinging their IP addresses and storing the results in a PostgreSQL database. The results are displayed on a web page.
+Этот проект представляет собой макет системы мониторинга Docker-контейнеров. Он демонстрирует базовую функциональность, такую как пинг хостов, хранение результатов в базе данных и их визуализацию.
 
-## Services
+## Сервисы
 
-- **Backend**: RESTful API for querying and adding ping results.
-- **Frontend**: React application to display ping results.
-- **Pinger**: Service that pings hosts and sends results to the backend.
-- **Database**: PostgreSQL database to store ping results.
-- **Nginx**: Reverse proxy to serve the frontend and backend.
+- **Backend**: RESTful API для запроса и добавления результатов пинга.
+- **Frontend**: React-приложение для отображения результатов пинга.
+- **Pinger**: Сервис, который пингует хосты и отправляет результаты на backend.
+- **Database**: База данных PostgreSQL для хранения результатов пинга.
+- **Nginx**: Обратный прокси-сервер обеспечивает внешний доступ к **frontend** и **backend**.
 
-## How to Run
+## Запуск проекта
 
-1. Clone the repository.
-2. Run `docker-compose up --build`.
-3. Open `http://localhost` in your browser.
+- Клонируйте репозиторий.
+- Выполните команду `docker-compose up --build`.
+- Откройте в браузере `http://localhost`.
 
-## Public API Endpoints
+## Публичные API-эндпоинты
 
-- `GET  /api/hosts`: Get list of hosts to ping.
-- `GET  /api/ping-results`: Get last ping results.
+- `GET  /api/hosts`: Получить список хостов для пинга.
+- `GET  /api/ping-results`: Получить последние результаты пинга.
 
-
-## How it works
+## Как это работает
 
 ### Pinger
 
-- При старте ожидает **backend**, получает список хостов которые нужно пинговать
+При запуске ожидает доступности **backend** и получает список хостов, которые необходимо отслеживать.
 
 `GET /hosts`
 
@@ -35,21 +34,22 @@ This project provides a solution for monitoring Docker containers by pinging the
     "hosts": [
         {
             "host_id": 1,
-            "host_name": "host1" // IP or FQDN
+            "host_name": "host1" // IP или FQDN
         },
         // ...
     ]
 }
 ```
 
-- Запускает сканер для каждого хоста и сбрасывает результаты на **backend**.
-Чтобы не нагружать базу еденичными запросами, перед отправкой результаты собираются в батчи.
+Запускает сканер для каждого хоста и отправляет результаты на **backend**. 
+Интервал сканирования задается переменной окружения `PING_INTERVAL` (по умолчанию `10s`).
+Чтобы избежать излишней нагрузки на **backend**, результаты собираются в батчи перед отправкой.
 
 `POST /ping-results`
 
 ```json
 {
-    "ping_resuts": [
+    "ping_results": [
         {
             "host_id": 1,
             "rtt": 100500, // round-trip time, duration ns
@@ -61,29 +61,26 @@ This project provides a solution for monitoring Docker containers by pinging the
 }
 ```
 
+### Backend
 
-## Backend
-
-Предоставляет ручки:
+Предоставляет следующие API-эндпоинты:
 
 - `GET  /pub/hosts`
 - `GET  /pub/ping-results`
-- `GET  /pub/ping`
 - `GET  /ping-results`
 - `POST /ping-results`
-- `GET  /ping`
 
-При старте ждет базу, получает список новых хостов через переменную окружения `PING_HOSTS`
-и добавляет их в базу.
+При запуске ожидает доступности базы данных, получает список новых хостов через переменную окружения `PING_HOSTS` и добавляет их в базу.
 
-Получает на `POST /ping-results` и скидывает результату в базу. Чтобы не дергать базу лишний раз,
-кэширует последние результаты и предоставляет их на ручке `GET /ping-results`.
+Получает результаты пингов на `POST /ping-results` и сохраняет их в базе данных.
 
-## Nginx
+Предоставляет последние результаты на эндпоинте `GET /ping-results`. Чтобы минимизировать нагрузку на базу данных, результаты кэшируются в памяти. При запуске кэш заполняется данными из базы даных.
 
-Проксирует **frontend** и **backend**. Ограничивает доступ к **backend**.
+### Nginx
 
-```nginx.conf
+Проксирует запросы к **frontend** и **backend**. Ограничивает доступ к **backend**.
+
+```nginx
 server {
     listen 80;
 
@@ -97,7 +94,6 @@ server {
 }
 ```
 
-## Frontend
+### Frontend
 
-Каждые 5с дергает публичную ручку `GET /api/ping-results` и обновляет страницу.
-Я не дока во фронтенд и в частности в *React*. Как получилось, так получилось...
+Каждые 5 секунд запрашивает публичный эндпоинт `GET /api/ping-results` и обновляет страницу с результатами.
