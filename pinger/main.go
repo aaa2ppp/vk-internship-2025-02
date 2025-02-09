@@ -19,8 +19,6 @@ import (
 
 const (
 	// TODO: to config
-	logLevel = slog.LevelDebug
-
 	shutdownTimeout  = 30 * time.Second
 	backendUpTimeout = 30 * time.Second
 
@@ -32,10 +30,14 @@ const (
 )
 
 var (
+	logLevel     = slog.LevelInfo
 	pingInterval = 10 * time.Second
 )
 
 func main() {
+	if _, ok := os.LookupEnv("DEBUG"); ok {
+		logLevel = slog.LevelDebug
+	}
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel})))
 
 	// TODO: to config

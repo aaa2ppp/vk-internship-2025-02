@@ -23,7 +23,7 @@ func (re repo) getLogger(ctx context.Context, op string) *slog.Logger {
 func (re repo) GetHosts(ctx context.Context) ([]Host, error) {
 	log := re.getLogger(ctx, "GetHosts")
 
-	const q = `select host_id, host_name from host;`
+	const q = `SELECT host_id, host_name FROM host;`
 
 	rows, err := re.db.QueryContext(ctx, q)
 	if err != nil {
@@ -50,13 +50,15 @@ func (re repo) GetHosts(ctx context.Context) ([]Host, error) {
 		return nil, errInternalError
 	}
 
+	log.Debug("", "hosts", hosts)
 	return hosts, nil
 }
 
 func (re repo) AddHosts(ctx context.Context, hosts []string) error {
 	log := re.getLogger(ctx, "AddHosts")
+	log.Debug("", "hosts", hosts)
 
-	var q = `insert into host (host_name) values (%s) on conflict do nothing;`
+	var q = `INSERT INTO host (host_name) VALUES (%s) ON CONFLICT DO NOTHING;`
 
 	placeholders := make([]string, 0, len(hosts))
 	values := make([]any, 0, len(hosts))
@@ -79,20 +81,43 @@ func (re repo) AddHosts(ctx context.Context, hosts []string) error {
 func (re repo) GetLastSuccessPingResults(ctx context.Context) ([]PingResult, error) {
 	log := re.getLogger(ctx, "GetLastSuccessPingResults")
 
-	const q = `select host_id, host_name, ip, ping_time, ping_rtt
-		from
-			(
-			select host_id, max(ping_time) as ping_time
-			from ping_result 
-			WHERE success
-			GROUP by host_id
-			) as q1
-			join ping_result using (host_id, ping_time)
-			join host using (host_id)
-		where success
-		order by host_name;`
+	// TODO: Поиск последней успешной записи в таблице ping_result этот неоптималеное
+	// решение и может создавать нагрузку на базу из-за отсутствия индекса по
+	// (host_id, ping_time). Создание индекса только для этого запроса нецелесообразно,
+	// так как запрос выполняется всего один раз при старте приложения.
+	// В качестве решения выбран вариант чтения ограниченного числа строк с конца лога
+	// с последующей выборкой из них.
+	// Альтернативное решение: поддержка отдельной таблицы с последними результатами для
+	// каждого хоста.
+	// Пока оставляем как есть, так как это макет.
 
-	rows, err := re.db.QueryContext(ctx, q)
+	const logTailLimit = 1000 // TODO: to config
+	const q = `WITH log_tail AS (
+		SELECT *
+		FROM ping_result
+		ORDER BY id DESC
+		LIMIT $1
+	)
+	SELECT
+		h.host_id,
+		h.host_name,
+		lt.ip,
+		lt.ping_time,
+		lt.ping_rtt
+	FROM (
+		SELECT DISTINCT ON (host_id)
+			host_id,
+			ip,
+			ping_time,
+			ping_rtt
+		FROM log_tail
+		WHERE success
+		ORDER BY host_id, ping_time DESC
+	) AS lt
+	JOIN host h USING (host_id)
+	ORDER BY h.host_name;`
+
+	rows, err := re.db.QueryContext(ctx, q, logTailLimit)
 	if err != nil {
 		log.Error(fmt.Sprintf("%v", err))
 		return nil, errInternalError
@@ -114,12 +139,13 @@ func (re repo) GetLastSuccessPingResults(ctx context.Context) ([]PingResult, err
 		return nil, errInternalError
 	}
 
+	log.Debug("", "results", results)
 	return results, nil
 }
 
 func (re repo) AddPingResults(ctx context.Context, results []PingResult) error {
 	log := re.getLogger(ctx, "AddPingResults")
-	log.Debug(fmt.Sprintf("%+v", results))
+	log.Debug("", "results", results)
 
 	var q = `INSERT INTO ping_result (host_id, ip, ping_time, ping_rtt, success) VALUES (%s);`
 

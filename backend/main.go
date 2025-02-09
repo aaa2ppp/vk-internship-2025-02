@@ -21,7 +21,6 @@ const (
 	readTimeout     = 10 * time.Second
 	writeTimeout    = 10 * time.Second
 	shutdownTimeout = 30 * time.Second
-	logLevel        = slog.LevelDebug
 	dbHost          = "db"
 	dbName          = "monitoring"
 	dbUser          = "postgres"
@@ -29,7 +28,14 @@ const (
 	dbUpTimeout     = 30 * time.Second
 )
 
+var (
+	logLevel = slog.LevelInfo
+)
+
 func main() {
+	if _, ok := os.LookupEnv("DEBUG"); ok {
+		logLevel = slog.LevelDebug
+	}
 	os.Exit(run())
 }
 

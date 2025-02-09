@@ -19,7 +19,8 @@ services:
     depends_on:
       - db
     environment:
-      PING_HOSTS: "db backend frontend nginx pinger"
+      PING_HOSTS: ${PING_HOSTS:-db backend frontend nginx pinger}
+      DEBUG:
 
   frontend:
     build: ./frontend
@@ -36,7 +37,8 @@ services:
       - frontend
       - nginx
     environment:
-      PING_INTERVAL: 10s
+      PING_INTERVAL: ${PING_INTERVAL:-10s}
+      DEBUG:
 
   nginx:
     build: ./nginx

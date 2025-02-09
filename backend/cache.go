@@ -55,7 +55,7 @@ func (ca *cache) Init(ctx context.Context) error {
 }
 
 func (ca *cache) getLogger(ctx context.Context, op string) *slog.Logger {
-	return GetLoggerFromContext(ctx).WithGroup("cache").With("op", op)
+	return GetLoggerFromContext(ctx).With("op", "cache."+op)
 }
 
 func (ca *cache) copyPingResult(dst, src *PingResult) {
@@ -74,7 +74,10 @@ func (ca *cache) GetLastSuccessPingResults(ctx context.Context) ([]PingResult, e
 			return nil, errInternalError
 		}
 	}
-	
+
+	log := ca.getLogger(ctx, "GetLastSuccessPingResults")
+	log.Debug("", "ca.data", ca.data)
+
 	return slices.Clone(ca.data), nil
 }
 
