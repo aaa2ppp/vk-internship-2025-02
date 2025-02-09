@@ -1,5 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { format } from 'date-fns';
 import { getPingResults } from './api';
+import './App.css';
+
+const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp);
+    return format(date, 'yyyy-MM-dd HH:mm:ss'); // Пример формата
+};
 
 interface PingResult {
     host_name: string;
@@ -23,6 +30,7 @@ const App: React.FC = () => {
 
     return (
         <div>
+            <h1>Docker Container Monitoring</h1>
             <table>
                 <thead>
                     <tr>
@@ -37,11 +45,16 @@ const App: React.FC = () => {
                         <tr key={index}>
                             <td>{result.host_name}</td>
                             <td>{result.ip}</td>
-                            <td align="right">{(result.rtt / 1e6).toLocaleString(undefined, {
-                                minimumFractionDigits: 3,
-                                maximumFractionDigits: 3,
-                            })}&nbsp;ms</td>
-                            <td>{result.time}</td>
+                            <td className="rtt">
+                                {(result.rtt / 1e6).toLocaleString(undefined, {
+                                    minimumFractionDigits: 3,
+                                    maximumFractionDigits: 3,
+                                })}
+                                &nbsp;ms
+                            </td>
+                            <td className="timestamp">
+                                {formatTimestamp(result.time)} {/* Форматируем timestamp */}
+                            </td>
                         </tr>
                     ))}
                 </tbody>
