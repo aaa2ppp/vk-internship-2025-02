@@ -82,7 +82,7 @@ func (s *httpSender) sendBatch() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", pingResultsURL, bytes.NewBuffer(jsonData))
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", s.url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		slog.Error("can't create http request", "error", err)
 		return
@@ -99,7 +99,7 @@ func (s *httpSender) sendBatch() {
 	}()
 
 	if httpResp.StatusCode >= 400 {
-		body, _ := io.ReadAll(httpReq.Body)
+		body, _ := io.ReadAll(httpResp.Body)
 		slog.Error("remote return error", "statusCode", httpResp.StatusCode, "body", unsafeString(body))
 		return
 	}
