@@ -11,25 +11,20 @@ import (
 )
 
 type httpSender struct {
-	ctx    context.Context
-	cancel context.CancelFunc
-	done   chan struct{}
-	url    string
-	c      chan PingResult
-	batch  []PingResult
+	done  chan struct{}
+	url   string
+	c     chan PingResult
+	batch []PingResult
 }
 
-func newHTTPSender(url string, n int) *httpSender {
-	ctx, cancel := context.WithCancel(context.Background())
+func newHTTPSender(url string, batchSize int, batchTimeout time.Duration) *httpSender {
 	snd := &httpSender{
-		ctx:    ctx,
-		cancel: cancel,
-		done:   make(chan struct{}),
-		url:    url,
-		c:      make(chan PingResult),
-		batch:  make([]PingResult, n),
+		done:  make(chan struct{}),
+		url:   url,
+		c:     make(chan PingResult),
+		batch: make([]PingResult, batchSize),
 	}
-	go snd.serve()
+	go snd.serve(batchTimeout)
 	return snd
 }
 
@@ -39,15 +34,13 @@ func (s *httpSender) Send(result PingResult) {
 
 func (s *httpSender) Close() {
 	close(s.c)
-	s.cancel()
 	<-s.done
 }
 
-func (s *httpSender) serve() {
+func (s *httpSender) serve(batchTimeout time.Duration) {
 	defer close(s.done)
 
-	tm := time.NewTimer(100500 * time.Second)
-	tm.Stop()
+	tm := time.NewTimer(0)
 
 	for {
 		result, ok := <-s.c
@@ -56,10 +49,9 @@ func (s *httpSender) serve() {
 		}
 		s.batch = append(s.batch[:0], result)
 
-		tm.Reset(sendBatchTimeout)
-
+		tm.Reset(batchTimeout)
 	waitLoop:
-		for {
+		for len(s.batch) < cap(s.batch) {
 			select {
 			case <-tm.C:
 				break waitLoop
@@ -68,15 +60,8 @@ func (s *httpSender) serve() {
 					break waitLoop
 				}
 				s.batch = append(s.batch, result)
-				if len(s.batch) == cap(s.batch) {
-					break waitLoop
-				}
 			}
 		}
-
-		// if !tm.Stop() { // начиная с 1.23 в этом нет необходимости
-		// 	<-tm.C
-		// }
 
 		s.sendBatch()
 	}
@@ -95,7 +80,9 @@ func (s *httpSender) sendBatch() {
 		return
 	}
 
-	httpReq, err := http.NewRequestWithContext(s.ctx, "POST", pingResultsURL, bytes.NewBuffer(jsonData))
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", pingResultsURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		slog.Error("can't create http request", "error", err)
 		return

@@ -22,11 +22,11 @@ const (
 	shutdownTimeout  = 30 * time.Second
 	backendUpTimeout = 30 * time.Second
 
-	sendBatchTimeout = 10 * time.Millisecond
-	baseURL          = "http://backend:8080"
-	pingResultsURL   = baseURL + "/ping-results"
-	hostsURL         = baseURL + "/hosts"
-	pingURL          = baseURL + "/ping"
+	batchTimeout   = 10 * time.Millisecond
+	baseURL        = "http://backend:8080"
+	pingResultsURL = baseURL + "/ping-results"
+	hostsURL       = baseURL + "/hosts"
+	pingURL        = baseURL + "/ping"
 )
 
 var (
@@ -68,7 +68,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	sender := newHTTPSender(pingResultsURL, len(hosts))
+	sender := newHTTPSender(pingResultsURL, len(hosts), batchTimeout)
 
 	var wg sync.WaitGroup
 	wg.Add(len(hosts))
@@ -103,8 +103,7 @@ func waitBackend(timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	tm := time.NewTimer(100500 * time.Second)
-	tm.Stop()
+	tm := time.NewTimer(0)
 
 	var lastErr error
 	for interval := 1 * time.Second; ; interval *= 2 {
@@ -117,11 +116,17 @@ func waitBackend(timeout time.Duration) error {
 		}
 		lastErr = err
 
+		if interval > 30*time.Second {
+			interval = 30
+		}
+
 		tm.Reset(interval)
 		select {
 		case <-tm.C:
 		case <-ctx.Done():
-			return httpPing(context.Background(), pingURL)
+			lastCtx, lastCancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer lastCancel()
+			return httpPing(lastCtx, pingURL)
 		}
 	}
 }

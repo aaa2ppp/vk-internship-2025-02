@@ -127,8 +127,7 @@ func waitDB(db *sql.DB, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	tm := time.NewTimer(100500 * time.Second)
-	tm.Stop()
+	tm := time.NewTimer(0)
 
 	var lastErr error
 	for interval := 1 * time.Second; ; interval *= 2 {
@@ -141,11 +140,17 @@ func waitDB(db *sql.DB, timeout time.Duration) error {
 		}
 		lastErr = err
 
+		if interval > 30*time.Second {
+			interval = 30
+		}
+
 		tm.Reset(interval)
 		select {
 		case <-tm.C:
 		case <-ctx.Done():
-			return db.Ping()
+			lastCtx, lastCancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer lastCancel()
+			return db.PingContext(lastCtx)
 		}
 	}
 }
