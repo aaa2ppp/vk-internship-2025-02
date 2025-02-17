@@ -1,0 +1,21 @@
+name: Merge Go Files
+
+# Запуск вручную
+on:
+  workflow_dispatch:
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4  # Используем актуальную версию
+
+      - name: Merge .go files
+        run: |
+          find . -name "*.go" -exec sh -c 'f={};printf "// === ${f#.} ===\n";cat $f;echo' ';' > merged_go_files.txt
+      - name: Upload merged file as artifact
+        uses: actions/upload-artifact@v4  # Используем актуальную версию
+        with:
+          name: merged_go_files.txt
+          path: merged_go_files.txt
