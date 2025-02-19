@@ -22,7 +22,7 @@ func newHTTPSender(url string, batchSize int, batchTimeout time.Duration) *httpS
 		done:  make(chan struct{}),
 		url:   url,
 		c:     make(chan PingResult),
-		batch: make([]PingResult, batchSize),
+		batch: make([]PingResult, 0, batchSize),
 	}
 	go snd.serve(batchTimeout)
 	return snd
