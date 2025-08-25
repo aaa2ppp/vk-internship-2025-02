@@ -30,7 +30,7 @@
 
 `GET /hosts`
 
-```json
+```jsonc
 {
     "hosts": [
         {
@@ -48,7 +48,7 @@
 
 `POST /ping-results`
 
-```json
+```jsonc
 {
     "ping_results": [
         {
